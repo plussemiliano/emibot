@@ -6,3 +6,5 @@ google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
 google-api-python-client==2.128.0
 pytz==2024.1
+SpeechRecognition==3.10.4
+pydub==0.25.1

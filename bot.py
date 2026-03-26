@@ -57,7 +57,7 @@ def transcribe_audio(ogg_path):
 def interpret_message(text):
     now = datetime.now(pytz.timezone(TIMEZONE))
     prompt = "Hoy es " + now.strftime("%A %d de %B de %Y, %H:%M") + " (Buenos Aires).\nEl usuario dice: \"" + text + "\"\nResponde SOLO con JSON valido: {\"type\": \"evento|gasto|ambos|consulta|analisis_gastos\",\"eventos\": [{\"titulo\": \"...\",\"fecha_inicio\": \"YYYY-MM-DDTHH:MM:SS\",\"fecha_fin\": \"YYYY-MM-DDTHH:MM:SS\",\"descripcion\": \"...\"}],\"gastos\": [{\"descripcion\": \"...\",\"monto\": 0.0,\"moneda\": \"ARS\",\"fecha\": \"YYYY-MM-DD\",\"categoria\": \"comida|transporte|servicios|entretenimiento|trabajo|otro\"}],\"respuesta\": \"mensaje amigable\"}"
-    response = anthropic_client.messages.create(model="claude-opus-4-5", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
+    response = anthropic_client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
     raw = response.content[0].text.strip()
     if "```" in raw:
         raw = raw.split("```")[1]
@@ -82,7 +82,7 @@ async def handle_voice(update, context):
         await update.message.reply_text("Entendi: " + text)
         await process_message(update, context, text)
     except Exception as e:
-        await update.message.reply_text("Error: " + str(e))
+        await update.message.reply_text("Error: " + str(e), parse_mode=None)
 
 async def process_message(update, context, text):
     try:
@@ -103,9 +103,10 @@ async def process_message(update, context, text):
             respuestas.append("Gasto: " + g["descripcion"] + " $" + str(g["monto"]))
         if data.get("type") == "analisis_gastos":
             respuestas.append(generar_analisis(gastos))
-        await update.message.reply_text("\n\n".join(respuestas) if respuestas else data.get("respuesta", "Listo"))
+        msg = "\n\n".join(respuestas) if respuestas else data.get("respuesta", "Listo")
+        await update.message.reply_text(msg, parse_mode=None)
     except Exception as e:
-        await update.message.reply_text("Error: " + str(e))
+        await update.message.reply_text("Error: " + str(e), parse_mode=None)
 
 def generar_analisis(gastos):
     if not gastos:
@@ -114,7 +115,7 @@ def generar_analisis(gastos):
     gastos_mes = [g for g in gastos if g.get("fecha","").startswith(now.strftime("%Y-%m"))]
     if not gastos_mes:
         return "No hay gastos este mes."
-    response = anthropic_client.messages.create(model="claude-opus-4-5", max_tokens=800, messages=[{"role": "user", "content": "Analisis de gastos: " + json.dumps(gastos_mes)}])
+    response = anthropic_client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=800, messages=[{"role": "user", "content": "Analisis de gastos: " + json.dumps(gastos_mes)}])
     return response.content[0].text
 
 async def start(update, context):
