@@ -43,8 +43,7 @@ def create_event(title, start_dt, end_dt, description=""):
         "end":   {"dateTime": end_dt.isoformat(),   "timeZone": TIMEZONE},
         "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": 60}]}
     }
-    result = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-    return result.get("htmlLink")
+    return service.events().insert(calendarId=CALENDAR_ID, body=event).execute().get("htmlLink")
 
 def transcribe_audio(ogg_path):
     wav_path = ogg_path.replace(".ogg", ".wav")
@@ -57,86 +56,7 @@ def transcribe_audio(ogg_path):
 
 def interpret_message(text):
     now = datetime.now(pytz.timezone(TIMEZONE))
-    prompt = f"""Hoy es {now.strftime('%A %d de %B de %Y, %H:%M')} (Buenos Aires, Argentina).
-El usuario dice: \"\"\"{text}\"\"\"
-Respondé SOLO con JSON válido:
-{{"type": "evento|gasto|ambos|consulta|analisis_gastos","eventos": [{{"titulo": "...","fecha_inicio": "YYYY-MM-DDTHH:MM:SS","fecha_fin": "YYYY-MM-DDTHH:MM:SS","descripcion": "..."}}],"gastos": [{{"descripcion": "...","monto": 0.0,"moneda": "ARS","fecha": "YYYY-MM-DD","categoria": "comida|transporte|servicios|entretenimiento|trabajo|otro"}}],"respuesta": "mensaje amigable en español"}}
-Si no hay eventos lista vacía. Si no especifica fin sumar 1 hora."""
-    response = anthropic_client.messages.create(model="claude-opus-4-5", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
-    raw = response.content[0].text.strip()
-    if "```" in raw:
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
-
-async def handle_text(update, context):
-    await process
-cd ~/emibot && curl -s https://raw.githubusercontent.com/plussemiliano/emibot/main/bot.py > /dev/null && cat > bot.py << 'ENDOFFILE'
-import os, json, logging, tempfile
-from datetime import datetime
-import pytz
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-import anthropic
-import speech_recognition as sr
-from pydub import AudioSegment
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-ANTHROPIC_KEY  = os.environ["ANTHROPIC_API_KEY"]
-TIMEZONE       = "America/Argentina/Buenos_Aires"
-GASTOS_FILE    = "gastos.json"
-CALENDAR_ID    = os.environ.get("CALENDAR_ID", "plussemiliano@gmail.com")
-
-anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-
-def load_gastos():
-    if os.path.exists(GASTOS_FILE):
-        with open(GASTOS_FILE) as f:
-            return json.load(f)
-    return []
-
-def save_gastos(gastos):
-    with open(GASTOS_FILE, "w") as f:
-        json.dump(gastos, f, ensure_ascii=False, indent=2)
-
-def get_calendar_service():
-    sa_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
-    creds = service_account.Credentials.from_service_account_info(sa_info, scopes=["https://www.googleapis.com/auth/calendar"])
-    return build("calendar", "v3", credentials=creds)
-
-def create_event(title, start_dt, end_dt, description=""):
-    service = get_calendar_service()
-    event = {
-        "summary": title,
-        "description": description,
-        "start": {"dateTime": start_dt.isoformat(), "timeZone": TIMEZONE},
-        "end":   {"dateTime": end_dt.isoformat(),   "timeZone": TIMEZONE},
-        "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": 60}]}
-    }
-    result = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-    return result.get("htmlLink")
-
-def transcribe_audio(ogg_path):
-    wav_path = ogg_path.replace(".ogg", ".wav")
-    AudioSegment.from_ogg(ogg_path).export(wav_path, format="wav")
-    r = sr.Recognizer()
-    with sr.AudioFile(wav_path) as source:
-        audio_data = r.record(source)
-    os.unlink(wav_path)
-    return r.recognize_google(audio_data, language="es-AR")
-
-def interpret_message(text):
-    now = datetime.now(pytz.timezone(TIMEZONE))
-    prompt = f"""Hoy es {now.strftime('%A %d de %B de %Y, %H:%M')} (Buenos Aires, Argentina).
-El usuario dice: \"\"\"{text}\"\"\"
-Respondé SOLO con JSON válido:
-{{"type": "evento|gasto|ambos|consulta|analisis_gastos","eventos": [{{"titulo": "...","fecha_inicio": "YYYY-MM-DDTHH:MM:SS","fecha_fin": "YYYY-MM-DDTHH:MM:SS","descripcion": "..."}}],"gastos": [{{"descripcion": "...","monto": 0.0,"moneda": "ARS","fecha": "YYYY-MM-DD","categoria": "comida|transporte|servicios|entretenimiento|trabajo|otro"}}],"respuesta": "mensaje amigable en español"}}
-Si no hay eventos lista vacía. Si no especifica fin sumar 1 hora."""
+    prompt = "Hoy es " + now.strftime("%A %d de %B de %Y, %H:%M") + " (Buenos Aires).\nEl usuario dice: \"" + text + "\"\nResponde SOLO con JSON valido: {\"type\": \"evento|gasto|ambos|consulta|analisis_gastos\",\"eventos\": [{\"titulo\": \"...\",\"fecha_inicio\": \"YYYY-MM-DDTHH:MM:SS\",\"fecha_fin\": \"YYYY-MM-DDTHH:MM:SS\",\"descripcion\": \"...\"}],\"gastos\": [{\"descripcion\": \"...\",\"monto\": 0.0,\"moneda\": \"ARS\",\"fecha\": \"YYYY-MM-DD\",\"categoria\": \"comida|transporte|servicios|entretenimiento|trabajo|otro\"}],\"respuesta\": \"mensaje amigable\"}"
     response = anthropic_client.messages.create(model="claude-opus-4-5", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
     raw = response.content[0].text.strip()
     if "```" in raw:
@@ -149,7 +69,7 @@ async def handle_text(update, context):
     await process_message(update, context, update.message.text)
 
 async def handle_voice(update, context):
-    await update.message.reply_text("🎙️ Transcribiendo audio...")
+    await update.message.reply_text("Transcribiendo audio...")
     try:
         voice_file = await update.message.voice.get_file()
         with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
@@ -159,11 +79,10 @@ async def handle_voice(update, context):
             text = transcribe_audio(tmp_path)
         finally:
             os.unlink(tmp_path)
-        await update.message.reply_text(f"📝 Entendí: _{text}_", parse_mode="Markdown")
+        await update.message.reply_text("Entendi: " + text)
         await process_message(update, context, text)
     except Exception as e:
-        logger.error(f"Error en audio: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        await update.message.reply_text("Error: " + str(e))
 
 async def process_message(update, context, text):
     try:
@@ -175,35 +94,31 @@ async def process_message(update, context, text):
                 start = datetime.fromisoformat(ev["fecha_inicio"])
                 end = datetime.fromisoformat(ev["fecha_fin"])
                 create_event(ev["titulo"], start, end, ev.get("descripcion", ""))
-                respuestas.append(f"✅ *{ev['titulo']}* agendado para el {start.strftime('%d/%m a las %H:%M')}\n🔔 Te aviso 1 hora antes")
+                respuestas.append("Agendado: " + ev["titulo"] + " el " + start.strftime("%d/%m a las %H:%M"))
             except Exception as e:
-                respuestas.append(f"⚠️ No pude agendar '{ev['titulo']}': {e}")
+                respuestas.append("Error: " + str(e))
         for g in data.get("gastos", []):
             gastos.append(g)
             save_gastos(gastos)
-            respuestas.append(f"💰 *{g['descripcion']}* — ${g['monto']:,.0f} {g['moneda']} ({g['categoria']})")
+            respuestas.append("Gasto: " + g["descripcion"] + " $" + str(g["monto"]))
         if data.get("type") == "analisis_gastos":
             respuestas.append(generar_analisis(gastos))
-        if respuestas:
-            await update.message.reply_text("\n\n".join(respuestas), parse_mode="Markdown")
-        else:
-            await update.message.reply_text(data.get("respuesta", "Listo ✅"))
+        await update.message.reply_text("\n\n".join(respuestas) if respuestas else data.get("respuesta", "Listo"))
     except Exception as e:
-        logger.error(f"Error: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text("Error: " + str(e))
 
 def generar_analisis(gastos):
     if not gastos:
-        return "📊 No hay gastos registrados todavía."
+        return "No hay gastos."
     now = datetime.now(pytz.timezone(TIMEZONE))
-    gastos_mes = [g for g in gastos if g.get("fecha", "").startswith(now.strftime("%Y-%m"))]
+    gastos_mes = [g for g in gastos if g.get("fecha","").startswith(now.strftime("%Y-%m"))]
     if not gastos_mes:
-        return "📊 No hay gastos este mes."
-    response = anthropic_client.messages.create(model="claude-opus-4-5", max_tokens=800, messages=[{"role": "user", "content": f"Análisis conciso de gastos del mes con totales por categoría y observaciones. Usá emojis. Datos: {json.dumps(gastos_mes, ensure_ascii=False)}"}])
+        return "No hay gastos este mes."
+    response = anthropic_client.messages.create(model="claude-opus-4-5", max_tokens=800, messages=[{"role": "user", "content": "Analisis de gastos: " + json.dumps(gastos_mes)}])
     return response.content[0].text
 
 async def start(update, context):
-    await update.message.reply_text("👋 Hola Emi!\n\n🗓️ Eventos — 'Reunión mañana a las 15'\n💰 Gastos — 'Gasté 5000 pesos en el super'\n📊 Análisis — 'Mostrame mis gastos del mes'\n\nTambién acepto audios 🎙️", parse_mode="Markdown")
+    await update.message.reply_text("Hola Emi! Manda eventos, gastos o audios.")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
