@@ -61,15 +61,15 @@ def transcribe_audio(ogg_path):
     return r.recognize_google(audio_data, language="es-AR")
 
 def interpret_message(text):
+    import re
     now = datetime.now(pytz.timezone(TIMEZONE))
-    prompt = "Hoy es " + now.strftime("%A %d de %B de %Y, %H:%M") + " (Buenos Aires).\nEl usuario dice: \"" + text + "\"\nResponde SOLO con JSON valido: {\"type\": \"evento|gasto|ambos|consulta|analisis_gastos\",\"eventos\": [{\"titulo\": \"...\",\"fecha_inicio\": \"YYYY-MM-DDTHH:MM:SS\",\"fecha_fin\": \"YYYY-MM-DDTHH:MM:SS\",\"descripcion\": \"...\"}],\"gastos\": [{\"descripcion\": \"...\",\"monto\": 0.0,\"moneda\": \"ARS\",\"fecha\": \"YYYY-MM-DD\",\"categoria\": \"comida|transporte|servicios|entretenimiento|trabajo|otro\"}],\"respuesta\": \"mensaje amigable\"}"
+    prompt = "Hoy es " + now.strftime("%A %d de %B de %Y, %H:%M") + " (Buenos Aires).\nEl usuario dice: \"" + text + "\"\nResponde SOLO con JSON valido sin markdown: {\"type\": \"evento|gasto|ambos|consulta|analisis_gastos\",\"eventos\": [{\"titulo\": \"...\",\"fecha_inicio\": \"YYYY-MM-DDTHH:MM:SS\",\"fecha_fin\": \"YYYY-MM-DDTHH:MM:SS\",\"descripcion\": \"...\"}],\"gastos\": [{\"descripcion\": \"...\",\"monto\": 0.0,\"moneda\": \"ARS\",\"fecha\": \"YYYY-MM-DD\",\"categoria\": \"comida|transporte|servicios|entretenimiento|trabajo|otro\"}],\"respuesta\": \"mensaje amigable\"}"
     response = anthropic_client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
     raw = response.content[0].text.strip()
-    if "```" in raw:
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    return json.loads(raw)
 
 async def handle_text(update, context):
     await process_message(update, context, update.message.text)
