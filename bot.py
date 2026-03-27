@@ -30,19 +30,8 @@ def save_gastos(gastos):
         json.dump(gastos, f, ensure_ascii=False, indent=2)
 
 def get_calendar_service():
-    raw = os.environ["GOOGLE_SERVICE_ACCOUNT"]
-    logger.info("GOOGLE_SERVICE_ACCOUNT first 20 chars: %s", raw[:20])
-    try:
-        decoded = base64.b64decode(raw).decode()
-        logger.info("base64 decoded OK, first 20 chars: %s", decoded[:20])
-        sa_info = json.loads(decoded)
-    except Exception as e:
-        logger.info("base64 failed (%s), trying raw JSON", e)
-        sa_info = json.loads(raw)
-        if "private_key" in sa_info:
-            sa_info["private_key"] = sa_info["private_key"].replace("\\n", "\n")
-    logger.info("SA email: %s, key_id: %s", sa_info.get("client_email"), sa_info.get("private_key_id","")[:8])
-    creds = service_account.Credentials.from_service_account_info(sa_info, scopes=["https://www.googleapis.com/auth/calendar"])
+    sa_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sa_key.json")
+    creds = service_account.Credentials.from_service_account_file(sa_path, scopes=["https://www.googleapis.com/auth/calendar"])
     return build("calendar", "v3", credentials=creds)
 
 def create_event(title, start_dt, end_dt, description=""):
