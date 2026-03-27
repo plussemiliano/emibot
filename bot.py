@@ -31,12 +31,17 @@ def save_gastos(gastos):
 
 def get_calendar_service():
     raw = os.environ["GOOGLE_SERVICE_ACCOUNT"]
+    logger.info("GOOGLE_SERVICE_ACCOUNT first 20 chars: %s", raw[:20])
     try:
-        sa_info = json.loads(base64.b64decode(raw).decode())
-    except Exception:
+        decoded = base64.b64decode(raw).decode()
+        logger.info("base64 decoded OK, first 20 chars: %s", decoded[:20])
+        sa_info = json.loads(decoded)
+    except Exception as e:
+        logger.info("base64 failed (%s), trying raw JSON", e)
         sa_info = json.loads(raw)
         if "private_key" in sa_info:
             sa_info["private_key"] = sa_info["private_key"].replace("\\n", "\n")
+    logger.info("SA email: %s, key_id: %s", sa_info.get("client_email"), sa_info.get("private_key_id","")[:8])
     creds = service_account.Credentials.from_service_account_info(sa_info, scopes=["https://www.googleapis.com/auth/calendar"])
     return build("calendar", "v3", credentials=creds)
 
@@ -66,10 +71,11 @@ def interpret_message(text):
     prompt = "Hoy es " + now.strftime("%A %d de %B de %Y, %H:%M") + " (Buenos Aires).\nEl usuario dice: \"" + text + "\"\nResponde SOLO con JSON valido sin markdown: {\"type\": \"evento|gasto|ambos|consulta|analisis_gastos\",\"eventos\": [{\"titulo\": \"...\",\"fecha_inicio\": \"YYYY-MM-DDTHH:MM:SS\",\"fecha_fin\": \"YYYY-MM-DDTHH:MM:SS\",\"descripcion\": \"...\"}],\"gastos\": [{\"descripcion\": \"...\",\"monto\": 0.0,\"moneda\": \"ARS\",\"fecha\": \"YYYY-MM-DD\",\"categoria\": \"comida|transporte|servicios|entretenimiento|trabajo|otro\"}],\"respuesta\": \"mensaje amigable\"}"
     response = anthropic_client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
     raw = response.content[0].text.strip()
+    logger.info("Anthropic raw (first 200): %s", raw[:200])
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if match:
         return json.loads(match.group())
-    return json.loads(raw)
+    raise ValueError("No JSON found in response: " + raw[:100])
 
 async def handle_text(update, context):
     await process_message(update, context, update.message.text)
