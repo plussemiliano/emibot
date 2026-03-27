@@ -30,8 +30,12 @@ def save_gastos(gastos):
         json.dump(gastos, f, ensure_ascii=False, indent=2)
 
 def get_calendar_service():
-    sa_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sa_key.json")
-    creds = service_account.Credentials.from_service_account_file(sa_path, scopes=["https://www.googleapis.com/auth/calendar"])
+    raw = os.environ["GOOGLE_SERVICE_ACCOUNT"]
+    # Write to temp file — avoids all JSON/base64 parsing issues
+    tmp_path = "/tmp/sa_key.json"
+    with open(tmp_path, "w") as f:
+        f.write(raw)
+    creds = service_account.Credentials.from_service_account_file(tmp_path, scopes=["https://www.googleapis.com/auth/calendar"])
     return build("calendar", "v3", credentials=creds)
 
 def create_event(title, start_dt, end_dt, description=""):
