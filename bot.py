@@ -98,17 +98,22 @@ async def handle_voice(update, context):
 
 async def process_message(update, context, text):
     try:
+        logger.info("=== PROCESSING: %s ===", text)
         data = interpret_message(text)
+        logger.info("=== INTERPRETED: %s ===", json.dumps(data, ensure_ascii=False)[:200])
         gastos = load_gastos()
         respuestas = []
         for ev in data.get("eventos", []):
             try:
                 start = datetime.fromisoformat(ev["fecha_inicio"])
                 end = datetime.fromisoformat(ev["fecha_fin"])
-                create_event(ev["titulo"], start, end, ev.get("descripcion", ""))
+                logger.info("=== CREATING EVENT: %s ===", ev["titulo"])
+                link = create_event(ev["titulo"], start, end, ev.get("descripcion", ""))
+                logger.info("=== EVENT CREATED: %s ===", link)
                 respuestas.append("Agendado: " + ev["titulo"] + " el " + start.strftime("%d/%m a las %H:%M"))
             except Exception as e:
-                respuestas.append("Error: " + str(e))
+                logger.error("=== EVENT ERROR: %s ===", e, exc_info=True)
+                respuestas.append("Error calendario: " + str(e))
         for g in data.get("gastos", []):
             gastos.append(g)
             save_gastos(gastos)
@@ -118,6 +123,7 @@ async def process_message(update, context, text):
         msg = "\n\n".join(respuestas) if respuestas else data.get("respuesta", "Listo")
         await update.message.reply_text(msg, parse_mode=None)
     except Exception as e:
+        logger.error("=== PROCESS ERROR: %s ===", e, exc_info=True)
         await update.message.reply_text("Error: " + str(e), parse_mode=None)
 
 def generar_analisis(gastos):
