@@ -31,6 +31,8 @@ def save_gastos(gastos):
 
 def get_calendar_service():
     sa_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
+    if "private_key" in sa_info:
+        sa_info["private_key"] = sa_info["private_key"].replace("\\n", "\n")
     creds = service_account.Credentials.from_service_account_info(sa_info, scopes=["https://www.googleapis.com/auth/calendar"])
     return build("calendar", "v3", credentials=creds)
 
